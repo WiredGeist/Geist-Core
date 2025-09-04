@@ -12,8 +12,8 @@ edition = "2021"
 tauri-build = { version = "2.4.1", features = [] }
 
 [dependencies]
-# This is the correct version for the main tauri runtime
-tauri = { version = "2.8.5", features = [] }
+# THIS IS THE CORRECTED LINE
+tauri = { version = "2.8.5", features = ["devtools"] }
 reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1.8", features = ["v4", "serde"] }
 
@@ -26,6 +26,7 @@ usearch = "2.9.0"
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tauri-plugin-http = "2.5.2"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

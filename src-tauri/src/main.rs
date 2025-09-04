@@ -5,7 +5,7 @@
 
 // --- IMPORTS ---
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -17,7 +17,7 @@ use tauri_plugin_shell::{
 };
 
 // --- STATE MANAGEMENT ---
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, Serialize)]
 pub struct DocumentChunk {
     content: String,
     embedding: Vec<f32>,
@@ -42,7 +42,6 @@ struct StartServerArgs {
     embedding: bool,
 }
 
-// THIS IS THE CORRECT, ORIGINAL STRUCT FOR PARSING THE SERVER'S RESPONSE
 #[derive(Deserialize, Debug)]
 struct EmbeddingObject {
     embedding: Vec<Vec<f32>>,
@@ -50,6 +49,52 @@ struct EmbeddingObject {
 #[derive(Deserialize, Debug)]
 #[serde(transparent)]
 struct EmbeddingApiResponse(Vec<EmbeddingObject>);
+
+// --- OLLAMA STRUCTS ---
+#[derive(Serialize, Deserialize, Debug)]
+struct OllamaModel {
+    name: String,
+    modified_at: String,
+    size: u64,
+}
+
+#[derive(Deserialize, Debug)]
+struct OllamaTagsResponse {
+    models: Vec<OllamaModel>,
+}
+
+// --- GEMINI / GOOGLE STRUCTS ---
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct GoogleModel {
+    name: String,
+    #[serde(rename = "supportedGenerationMethods")]
+    supported_generation_methods: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct GoogleModelListResponse {
+    models: Vec<GoogleModel>,
+}
+
+#[derive(Deserialize, Debug)]
+struct GeminiPart {
+    text: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct GeminiContent {
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Deserialize, Debug)]
+struct GeminiCandidate {
+    content: GeminiContent,
+}
+
+#[derive(Deserialize, Debug)]
+struct GeminiResponse {
+    candidates: Vec<GeminiCandidate>,
+}
 
 
 // --- HELPER FUNCTIONS ---
@@ -71,7 +116,6 @@ fn chunk_text(text: &str, chunk_size: usize, chunk_overlap: usize) -> Vec<String
     chunks
 }
 
-// THIS HELPER NOW USES THE CORRECT PARSING LOGIC
 async fn get_embedding_for_text(text: &str) -> Result<Vec<f32>, String> {
     let client = Client::new();
     let payload = json!({ "content": text });
@@ -105,18 +149,16 @@ fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
     if norm_v1 == 0.0 || norm_v2 == 0.0 { 0.0 } else { dot_product / (norm_v1 * norm_v2) }
 }
 
-// --- TAURI COMMANDS ---
+// --- CORE TAURI COMMANDS ---
 
 #[tauri::command]
 async fn index_file(content: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut new_chunks = Vec::new();
     let chunks = chunk_text(&content, 512, 50);
-
     for chunk_content in chunks {
         let embedding = get_embedding_for_text(&chunk_content).await?;
         new_chunks.push(DocumentChunk { content: chunk_content, embedding });
     }
-
     state.vector_store.lock().unwrap().extend(new_chunks);
     Ok(())
 }
@@ -125,20 +167,15 @@ async fn index_file(content: String, state: State<'_, AppState>) -> Result<(), S
 async fn retrieve_context(query: String, state: State<'_, AppState>) -> Result<String, String> {
     let query_embedding = get_embedding_for_text(&query).await?;
     let vector_store = state.vector_store.lock().unwrap();
-
     if vector_store.is_empty() { return Ok("".to_string()); }
-
     let mut scored_chunks: Vec<(f32, String)> = vector_store.iter()
         .map(|chunk| (cosine_similarity(&query_embedding, &chunk.embedding), chunk.content.clone()))
         .collect();
-
     scored_chunks.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-    
     let final_context = scored_chunks.into_iter().take(3)
         .map(|(_, content)| content)
         .collect::<Vec<String>>()
         .join("\n\n---\n\n");
-
     Ok(final_context)
 }
 
@@ -153,13 +190,26 @@ fn open_file_dialog(app: AppHandle) -> Option<String> {
     app.dialog().file().add_filter("GGUF Models", &["gguf"]).blocking_pick_file().map(|path| path.to_string())
 }
 
+// --- OLLAMA COMMANDS ---
+#[tauri::command]
+async fn list_ollama_models(ollama_url: String) -> Result<Vec<OllamaModel>, String> {
+    let client = Client::new();
+    let endpoint = format!("{}/api/tags", ollama_url.trim_end_matches('/'));
+    let res = client.get(&endpoint).send().await.map_err(|e| format!("Failed to send request to Ollama: {}", e))?;
+    if res.status().is_success() {
+        let response_body = res.json::<OllamaTagsResponse>().await.map_err(|e| format!("Failed to parse Ollama response: {}", e))?;
+        Ok(response_body.models)
+    } else {
+        Err(format!("Ollama server error ({}): {}", res.status(), res.text().await.unwrap_or_default()))
+    }
+}
+
 #[tauri::command]
 async fn load_ollama_model(ollama_url: String, model_name: String) -> Result<(), String> {
     let client = Client::new();
     let endpoint = format!("{}/api/chat", ollama_url.trim_end_matches('/'));
     let body = json!({ "model": model_name, "messages": [{"role": "user", "content": " "}], "stream": false, "keep_alive": "5m" });
-    let res = client.post(&endpoint).json(&body).timeout(Duration::from_secs(600)).send().await
-        .map_err(|e| format!("Failed to send 'load' request to Ollama: {}", e))?;
+    let res = client.post(&endpoint).json(&body).timeout(Duration::from_secs(600)).send().await.map_err(|e| format!("Failed to send 'load' request to Ollama: {}", e))?;
     if res.status().is_success() { Ok(()) } else {
         Err(format!("Ollama server error ({}): {}", res.status(), res.text().await.unwrap_or_default()))
     }
@@ -175,6 +225,59 @@ async fn unload_ollama_model(ollama_url: String, model_name: String) -> Result<(
     Ok(())
 }
 
+// --- GEMINI / GOOGLE COMMANDS ---
+#[tauri::command]
+async fn list_google_models(api_key: String) -> Result<Vec<GoogleModel>, String> {
+    let client = Client::new();
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", api_key);
+    let res = client.get(&url).send().await.map_err(|e| format!("Failed to send request to Google API: {}", e))?;
+
+    if res.status().is_success() {
+        let data = res.json::<GoogleModelListResponse>().await.map_err(|e| format!("Failed to parse Google API response: {}", e))?;
+        // Replicate the filtering logic from your route.ts file
+        let filtered_models = data.models.into_iter().filter(|model|
+            model.supported_generation_methods.contains(&"generateContent".to_string()) &&
+            !model.name.contains("embedding") &&
+            !model.name.contains("image") &&
+            !model.name.contains("video") &&
+            !model.name.contains("aqa") &&
+            !model.name.contains("pro-") &&
+            model.name.contains("gemini")
+        ).collect();
+        Ok(filtered_models)
+    } else {
+        let status = res.status();
+        let error_text = res.text().await.unwrap_or_else(|_| "Unknown server error".to_string());
+        Err(format!("Google API failed with status {}: {}", status, error_text))
+    }
+}
+
+#[tauri::command]
+async fn call_gemini_api(api_key: String, model: String, prompt: String) -> Result<String, String> {
+    let client = Client::new();
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}", model, api_key);
+    let payload = json!({ "contents": [{ "parts": [{ "text": prompt }] }] });
+    let res = client.post(&url).json(&payload).send().await.map_err(|e| format!("Failed to send request to Google API: {}", e))?;
+    if res.status().is_success() {
+        match res.json::<GeminiResponse>().await {
+            Ok(data) => {
+                if let Some(candidate) = data.candidates.into_iter().next() {
+                    if let Some(part) = candidate.content.parts.into_iter().next() {
+                        Ok(part.text)
+                    } else { Err("Gemini API response was missing 'parts'.".to_string()) }
+                } else { Err("Gemini API response was missing 'candidates'.".to_string()) }
+            }
+            Err(e) => Err(format!("Failed to parse JSON from Google API: {}", e)),
+        }
+    } else {
+        let status = res.status();
+        let error_text = res.text().await.unwrap_or_else(|_| "Unknown server error".to_string());
+        Err(format!("Google API failed with status {}: {}", status, error_text))
+    }
+}
+
+
+// --- LLAMA.CPP COMMANDS ---
 #[tauri::command]
 async fn start_llama_server(app: AppHandle, state: State<'_, AppState>, args: StartServerArgs) -> Result<(), String> {
     stop_llama_server(state.clone())?;
@@ -186,7 +289,6 @@ async fn start_llama_server(app: AppHandle, state: State<'_, AppState>, args: St
         "-ngl".to_string(), args.gpu_layers.to_string(),
         "-mg".to_string(), args.main_gpu.to_string(),
     ];
-
     if args.embedding {
         sidecar_args.push("--embedding".to_string());
         sidecar_args.push("--pooling".to_string());
@@ -194,7 +296,6 @@ async fn start_llama_server(app: AppHandle, state: State<'_, AppState>, args: St
         sidecar_args.push("-ub".to_string());
         sidecar_args.push("8192".to_string());
     }
-
     if args.flash_attn { sidecar_args.push("-fa".to_string()); }
     if let Some(split) = args.tensor_split {
         if !split.trim().is_empty() { sidecar_args.extend(vec!["-ts".to_string(), split]); }
@@ -226,11 +327,8 @@ fn main() {
         vector_store: Mutex::new(Vec::new()),
     };
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .manage(state)
-        // REMOVED: The .setup hook with the "tauri://close-requested" listener is gone.
-        // .setup(|app| { ... })
-
-        // ADDED: This is the more reliable shutdown hook.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 println!("[Tauri] Main window closing, ensuring llama.cpp server is stopped.");
@@ -246,15 +344,27 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
-            open_file_dialog,
-            start_llama_server,
-            stop_llama_server,
-            load_ollama_model,
-            unload_ollama_model,
+            // Core Commands
             index_file,
             retrieve_context,
-            clear_rag_context
+            clear_rag_context,
+            open_file_dialog,
+            // Llama.cpp Commands
+            start_llama_server,
+            stop_llama_server,
+            // Ollama Commands
+            list_ollama_models,
+            load_ollama_model,
+            unload_ollama_model,
+            // Gemini Commands
+            list_google_models,
+            call_gemini_api
         ])
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            window.open_devtools();
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

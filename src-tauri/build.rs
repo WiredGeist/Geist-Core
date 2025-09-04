@@ -1,37 +1,44 @@
-use std::path::PathBuf;
+// src-tauri/build.rs
+
 use std::env;
 use std::fs;
+use std::path::Path;
 
 fn main() {
     tauri_build::build();
 
-    if env::var("PROFILE").unwrap() == "debug" {
-        // Define the source directory of your Llama.cpp files
-        let src_dir = PathBuf::from("../llama-cpp");
+    // Define the source directory relative to the `src-tauri` folder.
+    let src_dir = Path::new("../llama-cpp");
 
-        // Define the destination directory inside `target/debug`
-        let dest_dir = PathBuf::from("target/debug");
+    // We only proceed if the source directory actually exists.
+    if src_dir.exists() && src_dir.is_dir() {
+        // Get the output directory from the environment variable Cargo sets.
+        // This is a temporary directory like `target/release/build/geist-core-RANDOM_HASH/out`
+        let out_dir = env::var("OUT_DIR").unwrap();
 
-        // Tell Cargo to rerun this build script if the source directory changes.
+        // The final executables/DLLs need to go next to your app's .exe.
+        // This path navigates from the temporary `out` dir up to the root of the target folder
+        // (e.g., `target/release/` or `target/debug/`). This is a reliable method.
+        let dest_path = Path::new(&out_dir).join("../../..");
+
         println!("cargo:rerun-if-changed={}", src_dir.display());
 
-        // Read all entries in the source directory
-        let entries = fs::read_dir(&src_dir)
-            .expect(&format!("Failed to read source directory {:?}", src_dir));
-
-        // Iterate over each file/folder in the source directory
-        for entry in entries {
-            let entry = entry.expect("Failed to read directory entry");
+        // Iterate over each file in the source directory.
+        for entry in fs::read_dir(src_dir).unwrap() {
+            let entry = entry.unwrap();
             let src_path = entry.path();
             
-            // Only copy files, not sub-directories
+            // Only copy files, not sub-directories.
             if src_path.is_file() {
-                // Construct the destination path for this specific file
-                let dest_path = dest_dir.join(src_path.file_name().unwrap());
+                let dest_file = dest_path.join(src_path.file_name().unwrap());
 
-                // Copy the file
-                fs::copy(&src_path, &dest_path)
-                    .expect(&format!("Failed to copy sidecar dependency from {:?} to {:?}", src_path, dest_path));
+                // Tell Cargo to re-run this script if the source file changes.
+                println!("cargo:rerun-if-changed={}", src_path.display());
+                
+                // Copy the file to the final destination.
+                fs::copy(&src_path, &dest_file).unwrap_or_else(|err| {
+                    panic!("Failed to copy file from {} to {}: {}", src_path.display(), dest_file.display(), err);
+                });
             }
         }
     }

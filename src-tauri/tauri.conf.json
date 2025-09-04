@@ -26,7 +26,7 @@
               "allow": [
                 {
                   "name": "run-sidecar",
-                  "cmd": "$APPDATA/../llama-cpp/llama-server.exe",
+                  "cmd": "llama-server.exe",
                   "args": true
                 }
               ]
@@ -64,14 +64,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "../llama-cpp/llama-server.exe",
-      "../llama-cpp/ggml-base.dll",
-      "../llama-cpp/ggml-cuda.dll",
-      "../llama-cpp/ggml-rpc.dll",
-      "../llama-cpp/ggml.dll",
-      "../llama-cpp/llama.dll"
-    ]
+    "resources": {
+      "../llama-cpp": "."
+    }
   },
   "plugins": {}
 }

@@ -1,3 +1,5 @@
+// src/components/settings-form.tsx
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +47,16 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSettings, type Settings } from "@/hooks/use-settings";
 import { useChatStore } from "@/stores/chat-store";
+
+// --- NEW TYPES FOR MODELS ---
+interface OllamaModel {
+  name: string;
+  modified_at: string;
+  size: number;
+}
+interface GoogleModel {
+  name: string;
+}
 
 const settingsSchema = z.object({
   localModelPath: z.string().optional(),
@@ -106,6 +118,14 @@ export function SettingsForm() {
   const [isStoppingServer, setIsStoppingServer] = useState(false);
   const clearAllChatData = useChatStore(state => state.clearAllData);
 
+  // --- NEW STATE FOR MODEL FETCHING ---
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [googleModels, setGoogleModels] = useState<GoogleModel[]>([]);
+  const [isOllamaLoading, setIsOllamaLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [ollamaError, setOllamaError] = useState('');
+  const [googleError, setGoogleError] = useState('');
+
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: settings,
@@ -133,6 +153,54 @@ export function SettingsForm() {
     });
   }
 
+  // --- NEW HANDLER FOR OLLAMA MODELS ---
+  const handleFetchOllamaModels = async () => {
+    const ollamaUrl = form.getValues('ollamaServer');
+    if (!ollamaUrl) {
+      setOllamaError('Ollama URL cannot be empty.');
+      return;
+    }
+    setIsOllamaLoading(true);
+    setOllamaError('');
+    setOllamaModels([]);
+    try {
+      const models: OllamaModel[] = await invoke('list_ollama_models', { ollamaUrl });
+      setOllamaModels(models);
+      if (models.length === 0) {
+        toast({ title: "No models found", description: "Your Ollama server has no models pulled. Use `ollama pull <model>`."});
+      } else {
+        toast({ title: "Success", description: "Found Ollama models."});
+      }
+    } catch (err: any) {
+      setOllamaError(err.toString());
+      toast({ variant: "destructive", title: "Ollama Error", description: err.toString() });
+    } finally {
+      setIsOllamaLoading(false);
+    }
+  };
+
+  // --- NEW HANDLER FOR GOOGLE MODELS ---
+  const handleFetchGoogleModels = async () => {
+    const apiKey = form.getValues('googleKey');
+    if (!apiKey) {
+      setGoogleError('Google API Key cannot be empty.');
+      return;
+    }
+    setIsGoogleLoading(true);
+    setGoogleError('');
+    setGoogleModels([]);
+    try {
+      const models: GoogleModel[] = await invoke('list_google_models', { apiKey });
+      setGoogleModels(models);
+      toast({ title: "Success", description: "Found Google Gemini models."});
+    } catch (err: any) {
+      setGoogleError(err.toString());
+      toast({ variant: "destructive", title: "Google API Error", description: err.toString() });
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   const handleStartServer = async () => {
     setIsStartingServer(true);
     const values = form.getValues();
@@ -158,7 +226,6 @@ export function SettingsForm() {
         flashAttn: values.llamaCppFlashAttention,
         mainGpu: values.llamaCppMainGpu,
         tensorSplit: values.llamaCppTensorSplit,
-        // The critical fix: tell the backend this is NOT an embedding server
         embedding: false, 
       };
       
@@ -167,8 +234,6 @@ export function SettingsForm() {
       toast({ title: "Server Command Sent", description: "Llama.cpp server is starting via the Tauri backend." });
 
     } catch (error: any) {
-      // --- THIS IS THE CORRECTED SYNTAX ---
-      // The catch block needs curly braces {}
       toast({ 
         variant: "destructive", 
         title: "Operation Failed", 
@@ -269,9 +334,16 @@ export function SettingsForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Ollama Server Address</FormLabel>
-                  <FormControl>
-                    <Input placeholder="http://localhost:11434" {...field} value={field.value ?? ''} />
-                  </FormControl>
+                  <div className="flex items-center gap-2">
+                    <FormControl>
+                      <Input placeholder="http://localhost:11434" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <Button type="button" onClick={handleFetchOllamaModels} disabled={isOllamaLoading}>
+                      {isOllamaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test & List'}
+                    </Button>
+                  </div>
+                  {ollamaError && <p className="text-sm text-destructive mt-1">{ollamaError}</p>}
+                  {ollamaModels.length > 0 && <FormDescription className="mt-1">Success! Found Models: {ollamaModels.map(m => m.name).join(', ')}</FormDescription>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -285,9 +357,16 @@ export function SettingsForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Google AI</FormLabel>
-                            <FormControl>
-                                <PasswordInput field={field} placeholder="AIzaSy..." />
-                            </FormControl>
+                            <div className="flex items-center gap-2">
+                              <FormControl>
+                                  <PasswordInput field={field} placeholder="AIzaSy..." />
+                              </FormControl>
+                              <Button type="button" onClick={handleFetchGoogleModels} disabled={isGoogleLoading}>
+                                {isGoogleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test & List'}
+                              </Button>
+                            </div>
+                            {googleError && <p className="text-sm text-destructive mt-1">{googleError}</p>}
+                            {googleModels.length > 0 && <FormDescription className="mt-1">Success! Found Models: {googleModels.map(m => m.name.replace('models/', '')).join(', ')}</FormDescription>}
                         </FormItem>
                     )}
                 />
@@ -669,7 +748,7 @@ export function SettingsForm() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button 
-              type="button" // --- THIS IS THE FIX ---
+              type="button"
               variant="outline" 
               className="w-full justify-start"
               onClick={() => open('https://github.com/WiredGeist')}
@@ -678,7 +757,7 @@ export function SettingsForm() {
               GitHub - WiredGeist
             </Button>
             <Button 
-              type="button" // --- THIS IS THE FIX ---
+              type="button"
               variant="outline" 
               className="w-full justify-start"
               onClick={() => open('https://www.wiredgeist.com/')}
@@ -687,7 +766,7 @@ export function SettingsForm() {
               Website - wiredgeist.com
             </Button>
             <Button 
-              type="button" // --- THIS IS THE FIX ---
+              type="button"
               variant="outline" 
               className="w-full justify-start"
               onClick={() => open('https://ko-fi.com/wiredgeist')}
