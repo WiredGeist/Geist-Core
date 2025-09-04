@@ -1,9 +1,11 @@
+// src/components/chat/chat-panel.tsx
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useChatStore } from '@/stores/chat-store';
-import { useSettings } from '@/hooks/use-settings';
+import { useSettings, GoogleModel, OllamaModel } from '@/hooks/use-settings'; // <-- IMPORT NEW TYPES
 import { useToast } from '@/hooks/use-toast';
 import { waitForLlamaServer } from '@/lib/llama-server-utils';
 import { ChatMessages } from '@/components/chat/chat-messages';
@@ -16,16 +18,12 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { RagManager } from './rag-manager';
 
-interface OllamaModel { name: string; }
-interface GoogleModel { name: string; displayName: string; }
+// This interface is now defined globally in use-settings.ts, so it's removed from here.
 
 export function ChatPanel() {
-  const { settings } = useSettings();
+  const { settings, setSettings } = useSettings(); // <-- GET setSettings
   const { toast } = useToast();
-  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
-  const [googleModels, setGoogleModels] = useState<GoogleModel[]>([]);
-  const [isLoadingOllama, setIsLoadingOllama] = useState(false);
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+  // --- REMOVED LOCAL STATE FOR MODELS AND LOADING ---
   const [isRagManagerOpen, setIsRagManagerOpen] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isChangingModel, setIsChangingModel] = useState(false);
@@ -34,6 +32,10 @@ export function ChatPanel() {
   const activeConversation = useChatStore(state => state.activeConversationId ? state.conversations[state.activeConversationId] : null);
   const isGGUFLoaded = useChatStore(state => state.selectedModel === 'gguf-local');
   const isRagActive = useChatStore(state => !!activeConversation?.ragDocuments && activeConversation.ragDocuments.length > 0);
+
+  // --- READ MODELS FROM GLOBAL STATE ---
+  const ollamaModels: OllamaModel[] = settings.ollamaModels || [];
+  const googleModels: GoogleModel[] = settings.googleModels || [];
 
   const startLlamaCppServer = async (modelPathToLoad: string, isEmbedding: boolean): Promise<boolean> => {
     if (!modelPathToLoad) {
@@ -70,35 +72,32 @@ export function ChatPanel() {
     }
   };
 
-  useEffect(() => {
-    if (settings.ollamaServer) {
-      setIsLoadingOllama(true);
-      fetch('/api/ollama', { method: 'POST', body: JSON.stringify({ serverAddress: settings.ollamaServer }), headers: { 'Content-Type': 'application/json' }})
-        .then(res => res.json()).then(data => data.models ? setOllamaModels(data.models) : setOllamaModels([])).catch(() => setOllamaModels([])).finally(() => setIsLoadingOllama(false));
-    } else { setOllamaModels([]); }
-  }, [settings.ollamaServer]);
-
-  useEffect(() => {
-    if (settings.googleKey) {
-        setIsLoadingGoogle(true);
-        fetch('/api/google', { method: 'POST', body: JSON.stringify({ apiKey: settings.googleKey }), headers: { 'Content-Type': 'application/json' }})
-        .then(res => res.json()).then(data => data.models ? setGoogleModels(data.models) : setGoogleModels([])).catch(() => setGoogleModels([])).finally(() => setIsLoadingGoogle(false));
-    } else { setGoogleModels([]); }
-  }, [settings.googleKey]);
+  // --- REMOVED THE TWO BROKEN useEffect BLOCKS FOR FETCHING MODELS ---
 
   const handleModelChange = async (newModelId: string) => {
     const currentModel = selectedModel;
-    const modelId = newModelId.startsWith('models/') ? newModelId.substring(7) : newModelId;
+    
+    // --- FIX: GOOGLE MODEL NAME HANDLING ---
+    // The value from the select item is already the shortened name
+    const modelId = newModelId; 
+    
     if (modelId === currentModel) return;
+
     setIsChangingModel(true);
     try {
       if (isGGUFLoaded) await stopGGUFServer();
+      
+      // Unload previous Ollama model if it was active
       if (settings.ollamaServer && ollamaModels.some(m => m.name === currentModel)) {
         toast({ title: "Unloading previous model..." });
         await invoke('unload_ollama_model', { ollamaUrl: settings.ollamaServer, modelName: currentModel });
       }
+      
       setSelectedModel(modelId);
+      setSettings({ activeOllamaModel: modelId }); // Store active model
+      
       const isNewModelOllama = ollamaModels.some(m => m.name === modelId);
+      
       if (settings.ollamaServer && isNewModelOllama) {
         toast({ title: "Loading Ollama Model", description: `Please wait while '${modelId}' is loaded into memory...` });
         await invoke('load_ollama_model', { ollamaUrl: settings.ollamaServer, modelName: modelId });
@@ -129,13 +128,15 @@ export function ChatPanel() {
       const success = await startLlamaCppServer(settings.localModelPath, false);
       if (success) {
         setSelectedModel('gguf-local');
+        setSettings({ activeOllamaModel: undefined }); // Clear active ollama model
       }
     } else {
       await stopGGUFServer();
       toast({ title: "Local GGUF model unloaded." });
       const firstOllamaModel = ollamaModels[0]?.name;
-      const firstCloudModel = googleModels[0]?.name?.substring(7) ?? 'no-models';
-      await handleModelChange(firstOllamaModel || firstCloudModel);
+      const firstGoogleModel = googleModels[0]?.name;
+      // Default to first available model
+      await handleModelChange(firstOllamaModel || firstGoogleModel || 'no-models');
     }
     setIsChangingModel(false);
   };
@@ -145,26 +146,20 @@ export function ChatPanel() {
       addMessage(messageText);
       return;
     }
-
     setIsProcessingFile(true);
     toast({ title: "RAG Active", description: "Retrieving context..." });
-
     const ggufChatWasActive = selectedModel === 'gguf-local';
     let context: string | undefined = undefined;
-
     try {
       if (ggufChatWasActive) {
         await stopGGUFServer();
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-
       if (!settings.embeddingModelPath) throw new Error("Embedding model path is not configured.");
       const startSuccess = await startLlamaCppServer(settings.embeddingModelPath, true);
       if (!startSuccess) throw new Error("Failed to start embedding server.");
       if (!(await waitForLlamaServer(90000))) throw new Error("Embedding server timed out.");
-
       context = await invoke<string>("retrieve_context", { query: messageText });
-
       if (context && context.trim() !== '') {
         toast({ title: "Context Found", description: "Sending context to the model." });
       } else {
@@ -178,13 +173,10 @@ export function ChatPanel() {
       if (ggufChatWasActive && settings.localModelPath) {
         toast({ title: "Restarting Chat Server..." });
         await startLlamaCppServer(settings.localModelPath, false);
-        // --- THIS IS THE FINAL FIX ---
-        // We MUST wait for the chat server to be ready before proceeding.
         await waitForLlamaServer(90000);
       }
       setIsProcessingFile(false);
     }
-    
     addMessage(messageText, context);
   };
 
@@ -193,29 +185,18 @@ export function ChatPanel() {
       toast({ variant: "destructive", title: "Embedding Model not set in settings." });
       return;
     }
-
-    if (!activeConversation) {
-      createNewConversation();
-    }
-
+    if (!activeConversation) { createNewConversation(); }
     setIsProcessingFile(true);
     toast({ title: "Processing File...", description: "Starting embedding model..." });
-
     const ggufChatWasActive = isGGUFLoaded;
-
     try {
       if (ggufChatWasActive) await stopGGUFServer();
-      
       const startSuccess = await startLlamaCppServer(settings.embeddingModelPath, true);
       if (!startSuccess) throw new Error("Failed to start embedding server.");
       if (!(await waitForLlamaServer(90000))) throw new Error("Embedding server timed out.");
-
       const content = await file.text();
-      
       await invoke('index_file', { content });
-
       useChatStore.getState().addRagDocument({ fileName: file.name, content: content });
-
       toast({ title: "File Indexed", description: `${file.name} is ready for questions.` });
       setIsRagManagerOpen(false);
     } catch (error: any) {
@@ -224,7 +205,6 @@ export function ChatPanel() {
     } finally {
       await stopGGUFServer();
       setIsProcessingFile(false);
-      
       if (ggufChatWasActive && settings.localModelPath) {
          toast({ title: "Restarting Chat Model..." });
          await startLlamaCppServer(settings.localModelPath, false);
@@ -234,19 +214,19 @@ export function ChatPanel() {
 
   const getModelDisplayName = (modelId: string) => {
     if (modelId === 'gguf-local') return 'Local GGUF Model';
-    const googleModel = googleModels.find(m => m.name.substring(7) === modelId);
-    if (googleModel) return googleModel.displayName;
+    // The name from Google already includes 'gemini', so we just clean it up
+    const googleModel = googleModels.find(m => m.name === modelId);
+    if (googleModel) return modelId.replace('models/', '');
     const ollamaModel = ollamaModels.find(m => m.name === modelId);
     if (ollamaModel) return ollamaModel.name;
-    const cloudModelNames: Record<string, string> = {'gpt-4-turbo': 'GPT-4 Turbo', 'gpt-4': 'GPT-4', 'gpt-3.5-turbo': 'GPT-3.5 Turbo', 'claude-3-opus-20240229': 'Claude 3 Opus', 'claude-3-sonnet-20240229': 'Claude 3 Sonnet', 'claude-3-haiku-20240307': 'Claude 3 Haiku'};
-    return cloudModelNames[modelId] || modelId;
+    return modelId || "Select Model"; // Fallback
   };
 
   const hasOllamaModels = ollamaModels.length > 0;
   const hasGoogleModels = googleModels.length > 0;
   const hasGGUFModel = !!settings.localModelPath;
   const hasAnyCloudModel = hasGoogleModels;
-  const hasAnyLocalModel = hasOllamaModels || hasGGUFModel;
+  const hasAnyLocalModel = hasOllamaModels;
   const noModelsConfigured = !hasGGUFModel && !hasAnyLocalModel && !hasAnyCloudModel;
 
   return (
@@ -267,18 +247,18 @@ export function ChatPanel() {
             <Select onValueChange={handleModelChange} value={selectedModel} disabled={isGGUFLoaded || noModelsConfigured || isChangingModel || isProcessingFile}>
               <SelectTrigger className="w-48"><SelectValue placeholder="Select a model" /></SelectTrigger>
               <SelectContent>
-                {(isLoadingOllama || isLoadingGoogle) && <div className="flex items-center justify-center p-2"><Loader2 className="h-4 w-4 animate-spin" /></div>}
-                {noModelsConfigured && !isLoadingOllama && !isLoadingGoogle && <SelectItem value="no-models" disabled>No models configured</SelectItem>}
-                {hasAnyLocalModel && (
+                {noModelsConfigured && <SelectItem value="no-models" disabled>No models configured</SelectItem>}
+                {(hasAnyLocalModel || hasGGUFModel) && (
                   <SelectGroup>
                     <SelectLabel>Local</SelectLabel>
+                    {hasGGUFModel && <SelectItem value="gguf-local">Local GGUF Model</SelectItem>}
                     {hasOllamaModels && ollamaModels.map((model) => ( <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem> ))}
                   </SelectGroup>
                 )}
                 {hasAnyCloudModel && (
                   <SelectGroup>
                     <SelectLabel>Cloud</SelectLabel>
-                    {hasGoogleModels && googleModels.map((model) => ( <SelectItem key={model.name} value={model.name.substring(7)}>{model.displayName}</SelectItem> ))}
+                    {hasGoogleModels && googleModels.map((model) => ( <SelectItem key={model.name} value={model.name}>{model.name.replace('models/', '')}</SelectItem> ))}
                   </SelectGroup>
                 )}
               </SelectContent>

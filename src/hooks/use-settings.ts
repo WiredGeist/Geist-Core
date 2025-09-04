@@ -1,7 +1,19 @@
+// src/hooks/use-settings.ts
+
 'use client';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+
+// --- NEW TYPES FOR MODELS ---
+export interface OllamaModel {
+  name: string;
+  modified_at: string;
+  size: number;
+}
+export interface GoogleModel {
+  name: string;
+}
 
 export interface Settings {
     localModelPath?: string;
@@ -11,6 +23,10 @@ export interface Settings {
     openAIKey?: string;
     anthropicKey?: string;
     googleKey?: string;
+    // --- ADDED THESE TWO LINES ---
+    ollamaModels?: OllamaModel[];
+    googleModels?: GoogleModel[];
+    
     port?: number;
     host?: string;
     remoteTunnel?: boolean;
@@ -42,6 +58,7 @@ export interface Settings {
     llamaCppThreads?: number;
     llamaCppBlasThreads?: number;
     llamaCppBlasBatchSize?: number;
+
     llamaCppLowVram?: boolean;
     llamaCppRowSplit?: boolean;
     llamaCppTensorSplit?: string;
@@ -51,16 +68,21 @@ export interface Settings {
 
 interface SettingsState {
   settings: Settings;
-  setSettings: (settings: Settings) => void;
+  // --- UPDATED setSettings TO ACCEPT PARTIAL UPDATES ---
+  setSettings: (newSettings: Partial<Settings>) => void;
 }
 
 const defaultSettings: Settings = {
     localModelPath: "",
     embeddingModelPath: "",
-    ollamaServer: "",
+    ollamaServer: "http://localhost:11434", // Set a default for convenience
     openAIKey: "",
     anthropicKey: "",
     googleKey: "",
+    // --- ADDED DEFAULTS FOR THE NEW ARRAYS ---
+    ollamaModels: [],
+    googleModels: [],
+
     port: 9002,
     host: "0.0.0.0",
     remoteTunnel: false,
@@ -102,11 +124,15 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       settings: defaultSettings,
-      setSettings: (settings: Settings) => set({ settings }),
+      // --- THIS IS THE IMPROVED setSettings FUNCTION ---
+      // It merges new settings instead of replacing the whole object.
+      setSettings: (newSettings: Partial<Settings>) => set((state) => ({ 
+        settings: { ...state.settings, ...newSettings }
+      })),
     }),
     {
-      name: 'geist-settings-storage', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+      name: 'geist-settings-storage',
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

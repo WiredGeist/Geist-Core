@@ -162,17 +162,20 @@ export function SettingsForm() {
     }
     setIsOllamaLoading(true);
     setOllamaError('');
-    setOllamaModels([]);
+    
     try {
       const models: OllamaModel[] = await invoke('list_ollama_models', { ollamaUrl });
-      setOllamaModels(models);
+      // --- THIS IS THE KEY CHANGE: SAVE TO GLOBAL STATE ---
+      setSettings({ ollamaModels: models }); 
+      
       if (models.length === 0) {
         toast({ title: "No models found", description: "Your Ollama server has no models pulled. Use `ollama pull <model>`."});
       } else {
-        toast({ title: "Success", description: "Found Ollama models."});
+        toast({ title: "Success", description: `Found ${models.length} Ollama models.`});
       }
     } catch (err: any) {
       setOllamaError(err.toString());
+      setSettings({ ollamaModels: [] }); // Clear models on error
       toast({ variant: "destructive", title: "Ollama Error", description: err.toString() });
     } finally {
       setIsOllamaLoading(false);
@@ -188,13 +191,16 @@ export function SettingsForm() {
     }
     setIsGoogleLoading(true);
     setGoogleError('');
-    setGoogleModels([]);
+    
     try {
       const models: GoogleModel[] = await invoke('list_google_models', { apiKey });
-      setGoogleModels(models);
-      toast({ title: "Success", description: "Found Google Gemini models."});
+      // --- THIS IS THE KEY CHANGE: SAVE TO GLOBAL STATE ---
+      setSettings({ googleModels: models }); 
+
+      toast({ title: "Success", description: `Found ${models.length} Google Gemini models.`});
     } catch (err: any) {
       setGoogleError(err.toString());
+      setSettings({ googleModels: [] }); // Clear models on error
       toast({ variant: "destructive", title: "Google API Error", description: err.toString() });
     } finally {
       setIsGoogleLoading(false);
