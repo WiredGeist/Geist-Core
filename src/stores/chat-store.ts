@@ -1,15 +1,15 @@
+// src/stores/chat-store.ts
+
 'use client';
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { useSettings } from '@/hooks/use-settings';
-
+import { useSettings, GoogleModel, OllamaModel } from '@/hooks/use-settings'; // <-- CORRECT IMPORTS
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; }
 export interface RagDocument { fileName: string; content: string; }
 
-// This constant needs to be defined in this file because it is used by the local model logic.
 const CONTEXT_PROMPT = `Please answer the following question based on the provided context. If the information is not in the context, state that you cannot answer.
 
 --- CONTEXT ---
@@ -18,7 +18,6 @@ const CONTEXT_PROMPT = `Please answer the following question based on the provid
 
 Question: {question}`;
 
-// The 'vectorChunks' and 'DocumentChunk' interfaces are no longer needed here.
 export interface Conversation {
   id: string;
   name: string;
@@ -50,8 +49,8 @@ interface ChatState {
 }
 
 const isGGUFModel = (modelId: string) => modelId === 'gguf-local';
-const isCloudModel = (modelId: string) => ['gpt-', 'claude-', 'gemini', 'models/'].some(p => modelId.startsWith(p));
-const isOllamaModel = (modelId: string) => !isGGUFModel(modelId) && !isCloudModel(modelId);
+// --- CORRECTED LOGIC TO IDENTIFY GOOGLE MODELS ---
+const isGoogleModel = (modelId: string) => modelId.startsWith('models/'); 
 
 
 export const useChatStore = create<ChatState>()(
@@ -142,6 +141,7 @@ export const useChatStore = create<ChatState>()(
         get().startNewConversation();
       },
 
+      // --- COMPLETE REWRITE OF THE addMessage FUNCTION ---
       addMessage: async (content: string, context?: string) => {
         let activeId = get().activeConversationId;
         if (!activeId) {
@@ -158,10 +158,7 @@ export const useChatStore = create<ChatState>()(
         set(state => {
           const currentConvo = state.conversations[activeId!];
           return {
-            conversations: {
-              ...state.conversations,
-              [activeId!]: { ...currentConvo, messages: [...currentConvo.messages, userMessage, assistantMessage] }
-            },
+            conversations: { ...state.conversations, [activeId!]: { ...currentConvo, messages: [...currentConvo.messages, userMessage, assistantMessage] } },
             isLoading: true,
             error: null
           };
@@ -171,100 +168,60 @@ export const useChatStore = create<ChatState>()(
           const { settings } = useSettings.getState();
           const { selectedModel } = get();
           const conversationHistory = get().conversations[activeId].messages.slice(0, -2);
-          const isCloudRequest = isCloudModel(selectedModel);
+          
+          let assistantResponse = '';
 
-          // --- THIS IS THE MODIFIED SECTION ---
-          if (isCloudRequest) {
-            // Instead of calling chat() directly, we now fetch from our API route.
-            const response = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: selectedModel,
-                query: content,
-                context: context, // Pass the RAG context
-                history: conversationHistory.map(m => ({ role: m.role, content: m.content })),
-                googleApiKey: settings.googleKey,
-                ollamaServer: settings.ollamaServer
-              }),
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.details || 'API request failed');
-            }
-
-            const result = await response.json();
-
-            set(state => {
-                const convo = state.conversations[activeId!];
-                const lastMsg = convo.messages[convo.messages.length - 1];
-                const updatedMsg = { ...lastMsg, content: result.answer };
-                return { conversations: { ...state.conversations, [activeId!]: { ...convo, messages: [...convo.messages.slice(0, -1), updatedMsg] } } };
-            });
-
-          } else {
-            // The local model logic (Ollama/GGUF) remains unchanged as it already uses fetch.
-            let finalContentForApi = content;
-            if (context && context.trim() !== '') {
-                finalContentForApi = CONTEXT_PROMPT.replace('{context}', context).replace('{question}', content);
-            }
-
-            const messagesForApi = [
-                ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
-                { role: 'user', content: finalContentForApi }
-            ];
-
-            let endpoint = '';
-            let body: BodyInit;
-
-            if (isGGUFModel(selectedModel)) {
-                endpoint = 'http://localhost:8080/v1/chat/completions';
-                body = JSON.stringify({ model: selectedModel, messages: messagesForApi, stream: true });
-            } else {
-                if (!settings.ollamaServer) throw new Error("Ollama server address is not configured in settings.");
-                endpoint = `${settings.ollamaServer}/api/chat`;
-                body = JSON.stringify({ model: selectedModel, messages: messagesForApi, stream: true });
-            }
-            
-            const res = await fetch(endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body });
-            if (!res.ok || !res.body) {
-              const errorText = await res.text();
-              throw new Error(`Request failed: ${res.status} - ${errorText}`);
-            }
-            
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const decodedChunk = decoder.decode(value);
-              const lines = decodedChunk.split('\n').filter(line => line.trim() !== '');
-              for (const line of lines) {
-                let chunkContent = '';
-                try {
-                  if (isGGUFModel(selectedModel)) {
-                      if (line.startsWith('data: ')) {
-                        const jsonStr = line.substring(6);
-                        if (jsonStr.trim() === '[DONE]') continue;
-                        chunkContent = JSON.parse(jsonStr).choices?.[0]?.delta?.content || '';
-                      }
-                  } else {
-                      chunkContent = JSON.parse(line).message?.content || '';
-                  }
-                } catch (e) { /* Ignore parsing errors */ }
-                
-                if (chunkContent) {
-                  set(state => {
-                    const convo = state.conversations[activeId!];
-                    const lastMsg = convo.messages[convo.messages.length - 1];
-                    const updatedMsg = { ...lastMsg, content: lastMsg.content + chunkContent };
-                    return { conversations: { ...state.conversations, [activeId!]: { ...convo, messages: [...convo.messages.slice(0, -1), updatedMsg] } } };
-                  });
-                }
-              }
-            }
+          // Construct the full prompt including context if it exists
+          let promptContent = content;
+          if (context && context.trim() !== '') {
+            promptContent = CONTEXT_PROMPT.replace('{context}', context).replace('{question}', content);
           }
+
+          const messagesForApi = [...conversationHistory, { role: 'user', content: promptContent }];
+
+          if (isGoogleModel(selectedModel)) {
+            if (!settings.googleKey) throw new Error("Google API Key not set.");
+            
+            // For Gemini, we create a simple string prompt for now
+            const prompt = messagesForApi.map(m => `${m.role}: ${m.content}`).join('\n');
+            
+            assistantResponse = await invoke('call_gemini_api', {
+              apiKey: settings.googleKey,
+              model: selectedModel, // e.g. "models/gemini-1.5-flash"
+              prompt: prompt,
+            });
+
+          } else if (isGGUFModel(selectedModel)) {
+            const res = await fetch('http://localhost:8080/v1/chat/completions', { 
+              method: 'POST', 
+              headers: {'Content-Type': 'application/json'}, 
+              body: JSON.stringify({ model: selectedModel, messages: messagesForApi, stream: false }) // Use non-streaming for simplicity
+            });
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(`GGUF server error: ${res.status} - ${errorText}`);
+            }
+            const data = await res.json();
+            assistantResponse = data.choices[0]?.message?.content || '';
+
+          } else { // This handles Ollama models
+            if (!settings.ollamaServer) throw new Error("Ollama server not configured.");
+            
+            assistantResponse = await invoke('call_ollama_api', {
+              ollamaUrl: settings.ollamaServer,
+              model: selectedModel,
+              messagesJson: JSON.stringify(messagesForApi),
+            });
+          }
+
+          // Update the final assistant message content
+          set(state => {
+              const convo = state.conversations[activeId!];
+              const lastMsg = convo.messages[convo.messages.length - 1];
+              const updatedMsg = { ...lastMsg, content: assistantResponse };
+              return { conversations: { ...state.conversations, [activeId!]: { ...convo, messages: [...convo.messages.slice(0, -1), updatedMsg] } } };
+          });
+
         } catch (e: any) {
             const errorMsg = e.toString();
             set(state => {
