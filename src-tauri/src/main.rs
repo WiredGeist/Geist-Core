@@ -408,16 +408,12 @@ fn main() {
             list_ollama_models,
             load_ollama_model,
             unload_ollama_model,
-            call_ollama_api,    // <-- THE FIX
+            call_ollama_api,
             // Gemini Commands
             list_google_models,
             call_gemini_api
         ])
-        .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
-            window.open_devtools();
-            Ok(())
-        })
+        
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
