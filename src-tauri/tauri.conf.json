@@ -17,13 +17,26 @@
           "identifier": "main-window-permissions",
           "windows": ["main"],
           "permissions": [
-            "shell:allow-execute",
+            "core:default",
+            "shell:default",
+            "dialog:default",
+            "log:default",
             {
-              "identifier": "http:allow-all",
+              "identifier": "shell:allow-execute",
               "allow": [
-                "http://localhost:8080/*",
-                "http://localhost:11434/*",
-                "https://generativelanguage.googleapis.com/*"
+                {
+                  "name": "run-sidecar",
+                  "cmd": "$APPDATA/../llama-cpp/llama-server.exe",
+                  "args": true
+                }
+              ]
+            },
+            {
+              "identifier": "http:default",
+              "allow": [
+                { "url": "http://localhost:8080/*" },
+                { "url": "http://localhost:11434/*" },
+                { "url": "https://generativelanguage.googleapis.com/*" }
               ]
             }
           ]
