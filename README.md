@@ -1,3 +1,4 @@
+
 # GEIST CORE
 
 <p align="center">
@@ -28,81 +29,51 @@
 
 ### IMPORTANT NOTES FOR V1.0.0
 
-* **Platform:** **This initial release has been developed and tested primarily on** **Windows 11**. While it may work on other systems, it is not officially supported at this time.
-* **Setup:** **This is a guide for running the app from the source code. A simple, one-click installer for users will be available in future releases.**
+* **Platform:** **This initial release has been developed and tested primarily on** **Windows 11 (64-bit)**. While it may work on other systems, it is not officially supported at this time.
+* **Release Files:** **You can either download the simple** **.exe** **installer or build the project from the source code. Instructions for both are below.**
 
 ---
 
-### GETTING STARTED (RUNNING FROM SOURCE)
+### GETTING STARTED (FOR USERS)
 
-**This guide will walk you through setting up and running Geist Core from the source code.**
+**This is the easy way to get started. These instructions are for using the pre-built application.**
 
-#### STEP 1: CLONE THE REPOSITORY
+* **Go to the Releases Page:** **Navigate to the official GitHub releases page for Geist Core.**
+* **Download the Installer:** **Find the latest release and download the** **.zip** **file that contains the installer (e.g.,** **Geist-Core-v1.0.0-windows-x64-setup.zip**).
+* **Extract and Install:** **Unzip the downloaded file. Inside, you will find a setup file (e.g.,** **Geist Core_1.0.0_x64-setup.exe**). Double-click this installer and follow the on-screen instructions.
 
-**First, get the code onto your machine.**
+**The application is now installed! The required** **llama-server.exe** **is bundled, so you don't need to download it separately. Just head to the "Configuration Guide" section below to set up your models.**
 
-**code**Bash
+---
 
-```
-git clone https://github.com/WiredGeist/Geist-Core.git
-```
+### BUILDING FROM SOURCE (FOR DEVELOPERS)
 
-**Then, navigate into the project folder:**
+**If you want to tinker with the code or build the app yourself, this section is for you.**
 
-**code**Bash
+#### PREREQUISITES
 
-```
-cd Geist-Core
-```
+* **Node.js:** [https://nodejs.org/en/download/](https://www.google.com/url?sa=E&q=https%3A%2F%2Fnodejs.org%2Fen%2Fdownload%2F) **(LTS version recommended)**
+* **Rust:** [https://rustup.rs](https://www.google.com/url?sa=E&q=https://rustup.rs/)
+* **Llama.cpp:** **You must place the pre-compiled binaries in a folder named** **llama-cpp** **in the project root.**
 
-#### STEP 2: SET UP THE LLAMA.CPP ENGINE
+  * **Download from:** [https://github.com/ggerganov/llama.cpp/releases](https://www.google.com/url?sa=E&q=https%3A%2F%2Fgithub.com%2Fggerganov%2Fllama.cpp%2Freleases)
 
-**Geist Core uses Llama.cpp to run local models. You need to add its files to the project.**
+#### SETUP & RUN
 
-* **Go to the Llama.cpp GitHub releases page:** [https://github.com/ggerganov/llama.cpp/releases](https://www.google.com/url?sa=E&q=https%3A%2F%2Fgithub.com%2Fggerganov%2Fllama.cpp%2Freleases)
-* **Download the zip file for your system (e.g.,** **llama-bXXXX-bin-win-cuda-cu12.1.1-x64.zip** **for Windows with NVIDIA).**
-* **Extract the contents.**
-* **CRITICAL STEP:** **Place the extracted folder inside the** **Geist Core** **project root and rename the folder to** **llama-cpp**. Your project structure must have this folder at the top level, next to **src** **and** **src-tauri**.
-
-#### STEP 3: INSTALL DEPENDENCIES & RUN
-
-**Now, let's get the application running.**
-
-* **Install all the necessary packages:**
-
-  **code**Bash
-
-  ```
+* **Clone the Repository:**
+  git clone https://github.com/WiredGeist/Geist-Core.git
+* **Navigate into the Project:**
+  cd Geist-Core
+* **Install Dependencies:**
   npm install
-  ```
 * **Run in Development Mode:**
-  If you want to debug, modify, or contribute to the code, this is the command for you. It starts the app with hot-reloading and full access to developer tools.
-
-  **code**Bash
-
-  ```
+  For active development with hot-reloading.
   npm run tauri dev
-  ```
-
-  **What happens now?**
-  The very first time you run this command, the Tauri CLI is smart. It will check your system for all the required dependencies, like the **Rust toolchain**. If anything is missing, **it will automatically prompt you to install it.** **Just follow the on-screen instructions, and it will handle the rest.**
 * **Build the Final Application:**
-  If you simply want to build the final, optimized **.exe** **installer to use the application as it is, run this command:**
-
-  **code**Bash 
-
-  ```
+  To build the final, optimized installers yourself, run this command:
   npm run tauri build
-  ```
 
-  **This command will compile everything in release mode (optimized for performance) and place the final** **.msi** **installer in the** **src-tauri/target/release/bundle/msi/** **directory. You can then run this installer to use the app.**
-
-#### TROUBLESHOOTING / MANUAL INSTALLS
-
-**If for some reason the automatic setup fails, you can install the dependencies manually:**
-
-* **Node.js:** **Download the LTS version from** [https://nodejs.org/en/download/](https://www.google.com/url?sa=E&q=https%3A%2F%2Fnodejs.org%2Fen%2Fdownload%2F)
-* **Rust:** **Install via rustup from** [https://rustup.rs/](https://www.google.com/url?sa=E&q=https%3A%2F%2Frustup.rs%2F)
+  **This will compile everything and place the final installers in the** **src-tauri/target/release/bundle/** **directory.**
 
 ---
 
@@ -112,72 +83,35 @@ cd Geist-Core
 
 #### GGUF Models (Local & Offline)
 
-* **Get a Model: Download GGUF models from Hugging Face:** [https://huggingface.co/models](https://www.google.com/url?sa=E&q=https%3A%2F%2Fhuggingface.co%2Fmodels)
-* **Add Chat Model: In Settings, go to** **Model Providers > Local GGUF Model Path** **and click "Browse" to select your downloaded GGUF chat model.**
-* **Add Embedding Model: For the RAG feature to work, you also need an embedding model. Go to** **RAG Settings** **and browse for a GGUF embedding model. You can find some here:** [https://huggingface.co/models?search=embedding%20gguf](https://www.google.com/url?sa=E&q=https://huggingface.co/models?search=embedding%20gguf)
+* **Get Models:** **Download GGUF chat and embedding models from** [Hugging Face](https://www.google.com/url?sa=E&q=https%3A%2F%2Fhuggingface.co%2Fmodels).
+* **Configure Paths:** **In Settings, use the "Browse" buttons under** **Model Providers** **and** **RAG Settings** **to select your downloaded model files.**
 
-#### Ollama
+#### Ollama & Google Gemini
 
-* **Install Ollama: If you don't have it, download and install it from the official site:** [https://ollama.com/](https://www.google.com/url?sa=E&q=https%3A%2F%2Follama.com%2F)
-* **Get a Model: Pull a model from the Ollama library. For example, you can try my fine-tuned model by opening a terminal and running:**
-  ollama run WiredGeist/geistv2
-* **Configure Geist Core: In Settings, go to** **Model Providers > Ollama Server Address** **and enter the address of your server (usually** **http://localhost:11434**).
-* **Your available Ollama models will now appear in the dropdown menu on the main chat screen.**
-
-#### Google Gemini
-
-* **Get an API Key: If you have a Google account, you can get a free API key to use with the Gemini models.**
-
-  * **Check pricing here:** [https://ai.google.dev/gemini-api/docs/pricing](https://www.google.com/url?sa=E&q=https%3A%2F%2Fai.google.dev%2Fgemini-api%2Fdocs%2Fpricing)
-  * **Get your key here:** [https://aistudio.google.com/app/apikey](https://www.google.com/url?sa=E&q=https%3A%2F%2Faistudio.google.com%2Fapp%2Fapikey)
-* **Configure Geist Core: In Settings, go to** **Model Providers > API Keys** **and paste your Google AI key into the field.**
-* **Available Gemini models will now appear in the chat dropdown.**
+* **Get Keys/Servers Ready:** **Install Ollama and pull a model, or get your free Google AI API key.**
+* **Configure:** **In Settings, enter your Ollama server address or paste in your Google AI key. Your models will now appear in the chat dropdown.**
 
 ---
 
 ### THE SETTINGS PANEL EXPLAINED
 
-#### Hardware (Llama.cpp)
-
-**This is where you tune the performance for your local GGUF models.**
-
-* **Hardware (CUDA/CPU):** **Choose whether to use your NVIDIA GPU (CUDA) or just your CPU. Note: If you select CUDA, you** **must** **set the GPU Layers to 1 or more, otherwise it will fall back to CPU.**
-* **Threads:** **Number of CPU threads to use for processing. A good starting point is your number of physical CPU cores.**
-* **GPU Layers:** **The number of model layers to offload to your GPU. This is the most important setting for performance. More layers = faster, but requires more VRAM.**
-* **And many other performance optimizations like** **Context Size**, **Flash Attention**, etc.
-
-**After setting this up, you can use the** **Launch/Stop GGUF Server** **buttons here, or just use the toggle on the main chat screen.**
-
-#### Chat Settings
-
+* **Hardware (Llama.cpp):** **A full suite of options to tune the performance of your local GGUF models. If you select** **CUDA**, you **must** **set the** **GPU Layers** **to 1 or more. For users without a powerful GPU,** **CPU Mode** **will offload the entire model to your system's RAM.**
 * **Chat Memory:** **This toggle controls whether the app sends your previous messages in the current conversation as context.**
-* **Danger Zone:** **The big red button,** **"Clear All Chat Data,"** **does exactly what it says. This cannot be undone.**
+* **Danger Zone:** **The** **"Clear All Chat Data"** **button wipes all saved conversations. This cannot be undone.**
 
 **Remember to hit** **"Save Changes"** **at the bottom after you've configured everything!**
 
 ---
 
-### USING THE CHAT INTERFACE
+### FUTURE PLANS (THE ROADMAP)
 
-* **The Left Sidebar:** **This is where your chat history lives. Start a new chat, continue an old one, or delete them.**
-* **The Top Header:**
+**This** **v1.0.0** **release is just the beginning. I have big plans for making Geist Core even more powerful. Here are some of the features I'm planning to integrate in future updates:**
 
-  * **Local GGUF Toggle:** **This switch** **only appears after you've set a GGUF model path**. Toggling it on starts the Llama.cpp server.
-  * **Model Dropdown:** **This lists all your available Ollama and Google Gemini models.**
-  * **RAG Button:** **Click this to open the document manager.**
-* **The Message Input:**
+* **Full Web Search Integration:** **Allow the AI to access the internet to answer questions about current events and provide up-to-date information.**
+* **Text-to-Speech (TTS):** **Add a feature to have the AI's responses read aloud.**
+* **Live Voice Chat:** **Integrate voice recognition and TTS for a full, hands-free conversational experience with the AI.**
 
-  * **The** **paperclip icon** **is another way to upload a text file directly to the chat for RAG.**
-
----
-
-### THE TECH STACK
-
-* **Framework:** **Tauri (v2)**
-* **Backend:** **Rust**
-* **Frontend:** **Next.js & React**
-* **UI:** **shadcn/ui & Tailwind CSS**
-* **State:** **Zustand**
+**Stay tuned for these and many more improvements!**
 
 ---
 
@@ -187,6 +121,8 @@ cd Geist-Core
 
 **If you dig what I'm doing, want to see what's next, or just want to support an indie dev, here's how:**
 
+* **YouTube:** **I post videos about AI, development, and my projects here.**
+  [https://www.youtube.com/@WiredGeist](https://www.google.com/url?sa=E&q=https%3A%2F%2Fwww.youtube.com%2F%40WiredGeist)
 * **Star the Repo on GitHub:** **This is the best way to show your support and help others discover the project.**
   [https://github.com/WiredGeist](https://www.google.com/url?sa=E&q=https%3A%2F%2Fgithub.com%2FWiredGeist)
 * **Follow My Work:** **I post about my projects, AI, and other tech explorations.**
@@ -200,4 +136,4 @@ cd Geist-Core
 
 ### LICENSE
 
-**MIT License - Go wild.**
+**MIT License**

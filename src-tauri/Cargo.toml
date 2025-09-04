@@ -1,10 +1,10 @@
 [package]
-name = "app"
-version = "0.1.0"
+name = "geist-core"
+version = "1.0.0"
 description = "Geist Chat"
-authors = ["you"]
-license = ""
-repository = ""
+authors = ["wiredgeist.com"]
+license = "MIT"
+repository = "https://github.com/WiredGeist/Geist-Core"
 edition = "2021"
 
 [build-dependencies]
@@ -18,9 +18,9 @@ reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1.8", features = ["v4", "serde"] }
 
 # All plugins must use their latest compatible RC versions
-tauri-plugin-dialog = "2.0.0-rc.1"
-tauri-plugin-log = "2.0.0-rc.1"
-tauri-plugin-shell = "2.0.0-rc.1"
+tauri-plugin-dialog = "2.4.0"
+tauri-plugin-log = "2.7.0"
+tauri-plugin-shell = "2.3.1"
 
 usearch = "2.9.0"
 
