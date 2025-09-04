@@ -11,16 +11,7 @@
   },
   "app": {
     "security": {
-      "csp": null,
-      "capabilities": [
-        {
-          "identifier": "main-window-permissions",
-          "windows": ["main"],
-          "permissions": [
-            "shell:allow-open"
-          ]
-        }
-      ]
+      "csp": null
     },
     "windows": [
       {
@@ -43,14 +34,30 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../llama-cpp/llama-server.exe"
+    "externalBin": [
+      "../llama-cpp/llama-server.exe",
+      "../llama-cpp/ggml-base.dll",
+      "../llama-cpp/ggml-cuda.dll",
+      "../llama-cpp/ggml-rpc.dll",
+      "../llama-cpp/ggml.dll",
+      "../llama-cpp/llama.dll"
     ]
   },
   "plugins": {
+    "shell": {
+      "scope": [
+        {
+          "name": "run-llama-server",
+          "cmd": "$APPDATA/../llama-cpp/llama-server.exe",
+          "args": true
+        }
+      ]
+    },
     "http": {
       "scope": [
-        "http://localhost:8080/*"
+        "http://localhost:8080/*",
+        "http://localhost:11434/*",
+        "https://generativelanguage.googleapis.com/*"
       ]
     }
   }

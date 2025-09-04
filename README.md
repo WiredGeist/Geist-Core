@@ -111,7 +111,7 @@
 * **Text-to-Speech (TTS):** **Add a feature to have the AI's responses read aloud.**
 * **Live Voice Chat:** **Integrate voice recognition and TTS for a full, hands-free conversational experience with the AI.**
 
-**Stay tuned for these and many more improvements!**
+**Stay tuned for these and many more improvements!** 
 
 ---
 
