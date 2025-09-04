@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Geist Core",
+  "version": "1.0.0",
+  "identifier": "com.wiredgeist.geist",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:9002",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-window-permissions",
+          "windows": ["main"],
+          "permissions": [
+            "shell:allow-open"
+          ]
+        }
+      ]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Geist Core",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "../llama-cpp/llama-server.exe"
+    ]
+  },
+  "plugins": {
+    "http": {
+      "scope": [
+        "http://localhost:8080/*"
+      ]
+    }
+  }
+}
