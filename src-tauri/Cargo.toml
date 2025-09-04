@@ -1,5 +1,4 @@
-// In src-tauri/Cargo.toml
-
+toml
 [package]
 name = "geist-core"
 version = "1.0.0"
@@ -14,7 +13,6 @@ tauri-build = { version = "2.4.1", features = [] }
 
 [dependencies]
 tauri = { version = "2.8.5", features = [] } 
-
 reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1.8", features = ["v4", "serde"] }
 
