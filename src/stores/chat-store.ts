@@ -187,7 +187,7 @@ export const useChatStore = create<ChatState>()(
             
             assistantResponse = await invoke('call_gemini_api', {
               apiKey: settings.googleKey,
-              model: selectedModel, // e.g. "models/gemini-1.5-flash"
+              model: selectedModel.replace('models/', ''),
               prompt: prompt,
             });
 

@@ -63,6 +63,26 @@ struct OllamaTagsResponse {
     models: Vec<OllamaModel>,
 }
 
+// --- NEW STRUCTS FOR OLLAMA CHAT ---
+#[derive(Serialize, Deserialize, Debug)]
+struct OllamaMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Serialize, Debug)]
+struct OllamaChatPayload {
+    model: String,
+    messages: Vec<OllamaMessage>,
+    stream: bool,
+}
+
+#[derive(Deserialize, Debug)]
+struct OllamaChatResponse {
+    message: OllamaMessage,
+}
+
+
 // --- GEMINI / GOOGLE STRUCTS ---
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct GoogleModel {
@@ -225,6 +245,33 @@ async fn unload_ollama_model(ollama_url: String, model_name: String) -> Result<(
     Ok(())
 }
 
+// --- NEW OLLAMA CHAT COMMAND ---
+#[tauri::command]
+async fn call_ollama_api(ollama_url: String, model: String, messages_json: String) -> Result<String, String> {
+    let messages: Vec<OllamaMessage> = serde_json::from_str(&messages_json)
+        .map_err(|e| format!("Failed to parse message history: {}", e))?;
+    
+    let client = Client::new();
+    let endpoint = format!("{}/api/chat", ollama_url.trim_end_matches('/'));
+
+    let payload = OllamaChatPayload {
+        model,
+        messages,
+        stream: false,
+    };
+
+    let res = client.post(&endpoint).json(&payload).send().await
+        .map_err(|e| format!("Failed to send request to Ollama: {}", e))?;
+    
+    if res.status().is_success() {
+        let response_body = res.json::<OllamaChatResponse>().await
+            .map_err(|e| format!("Failed to parse Ollama chat response: {}", e))?;
+        Ok(response_body.message.content)
+    } else {
+        Err(format!("Ollama server error ({}): {}", res.status(), res.text().await.unwrap_or_default()))
+    }
+}
+
 // --- GEMINI / GOOGLE COMMANDS ---
 #[tauri::command]
 async fn list_google_models(api_key: String) -> Result<Vec<GoogleModel>, String> {
@@ -234,15 +281,11 @@ async fn list_google_models(api_key: String) -> Result<Vec<GoogleModel>, String>
 
     if res.status().is_success() {
         let data = res.json::<GoogleModelListResponse>().await.map_err(|e| format!("Failed to parse Google API response: {}", e))?;
-        // Replicate the filtering logic from your route.ts file
         let filtered_models = data.models.into_iter().filter(|model|
             model.supported_generation_methods.contains(&"generateContent".to_string()) &&
-            !model.name.contains("embedding") &&
-            !model.name.contains("image") &&
-            !model.name.contains("video") &&
-            !model.name.contains("aqa") &&
-            !model.name.contains("pro-") &&
-            model.name.contains("gemini")
+            !model.name.contains("embedding") && !model.name.contains("image") &&
+            !model.name.contains("video") && !model.name.contains("aqa") &&
+            !model.name.contains("pro-") && model.name.contains("gemini")
         ).collect();
         Ok(filtered_models)
     } else {
@@ -281,6 +324,7 @@ async fn call_gemini_api(api_key: String, model: String, prompt: String) -> Resu
 #[tauri::command]
 async fn start_llama_server(app: AppHandle, state: State<'_, AppState>, args: StartServerArgs) -> Result<(), String> {
     stop_llama_server(state.clone())?;
+    
     let mut sidecar_args = vec![
         "-m".to_string(), args.model_path,
         "--port".to_string(), "8080".to_string(),
@@ -300,8 +344,16 @@ async fn start_llama_server(app: AppHandle, state: State<'_, AppState>, args: St
     if let Some(split) = args.tensor_split {
         if !split.trim().is_empty() { sidecar_args.extend(vec!["-ts".to_string(), split]); }
     }
-    let (mut rx, child) = app.shell().sidecar("llama-server.exe").map_err(|e| e.to_string())?.args(&sidecar_args).spawn().map_err(|e| e.to_string())?;
+
+    // --- THIS IS THE CORRECTED CODE ---
+    let (mut rx, child) = app.shell()
+        .sidecar("llama-server.exe").map_err(|e| e.to_string())?
+        .args(&sidecar_args)
+        .spawn().map_err(|e| e.to_string())?;
+    // ------------------------------------
+
     *state.llama_server_handle.lock().unwrap() = Some(child);
+    
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             if let CommandEvent::Stderr(bytes) = event {
@@ -356,6 +408,7 @@ fn main() {
             list_ollama_models,
             load_ollama_model,
             unload_ollama_model,
+            call_ollama_api,    // <-- THE FIX
             // Gemini Commands
             list_google_models,
             call_gemini_api
