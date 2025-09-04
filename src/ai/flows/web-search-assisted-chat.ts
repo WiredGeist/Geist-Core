@@ -1,6 +1,6 @@
 // src/ai/flows/web-search-assisted-chat.ts
 
-'use server';
+//'use server';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';

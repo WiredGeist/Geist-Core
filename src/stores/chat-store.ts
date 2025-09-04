@@ -3,11 +3,20 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { useSettings } from '@/hooks/use-settings';
-import { chat } from '@/ai/flows/chat';
+
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; }
 export interface RagDocument { fileName: string; content: string; }
+
+// This constant needs to be defined in this file because it is used by the local model logic.
+const CONTEXT_PROMPT = `Please answer the following question based on the provided context. If the information is not in the context, state that you cannot answer.
+
+--- CONTEXT ---
+{context}
+--- END CONTEXT ---
+
+Question: {question}`;
 
 // The 'vectorChunks' and 'DocumentChunk' interfaces are no longer needed here.
 export interface Conversation {
@@ -139,18 +148,13 @@ export const useChatStore = create<ChatState>()(
             activeId = get().createNewConversation();
         }
 
-        let finalContentForApi = content;
-        if (context && context.trim() !== '') {
-          finalContentForApi = `Please answer the following question based *only* on the context provided below. If the information to answer the question is not in the context, state that you cannot answer based on the provided documents.\n\n--- CONTEXT ---\n${context}\n--- END CONTEXT ---\n\nQuestion: ${content}`;
-        }
-
         if (get().conversations[activeId].isNew) {
           get().renameConversation(activeId, content.substring(0, 40));
         }
 
-        const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content };
+        const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: content };
         const assistantMessage: Message = { id: crypto.randomUUID(), role: 'assistant', content: "" };
-
+        
         set(state => {
           const currentConvo = state.conversations[activeId!];
           return {
@@ -162,20 +166,35 @@ export const useChatStore = create<ChatState>()(
             error: null
           };
         });
-
+        
         try {
           const { settings } = useSettings.getState();
           const { selectedModel } = get();
           const conversationHistory = get().conversations[activeId].messages.slice(0, -2);
           const isCloudRequest = isCloudModel(selectedModel);
 
+          // --- THIS IS THE MODIFIED SECTION ---
           if (isCloudRequest) {
-            const result = await chat({
-              model: selectedModel,
-              query: finalContentForApi,
-              history: conversationHistory.map(m => ({ role: m.role, content: m.content })),
-              googleApiKey: settings.googleKey,
+            // Instead of calling chat() directly, we now fetch from our API route.
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: selectedModel,
+                query: content,
+                context: context, // Pass the RAG context
+                history: conversationHistory.map(m => ({ role: m.role, content: m.content })),
+                googleApiKey: settings.googleKey,
+                ollamaServer: settings.ollamaServer
+              }),
             });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.details || 'API request failed');
+            }
+
+            const result = await response.json();
 
             set(state => {
                 const convo = state.conversations[activeId!];
@@ -185,6 +204,12 @@ export const useChatStore = create<ChatState>()(
             });
 
           } else {
+            // The local model logic (Ollama/GGUF) remains unchanged as it already uses fetch.
+            let finalContentForApi = content;
+            if (context && context.trim() !== '') {
+                finalContentForApi = CONTEXT_PROMPT.replace('{context}', context).replace('{question}', content);
+            }
+
             const messagesForApi = [
                 ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
                 { role: 'user', content: finalContentForApi }

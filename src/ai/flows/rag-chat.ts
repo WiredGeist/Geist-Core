@@ -1,5 +1,5 @@
 // RAG with File System flow
-'use server';
+//'use server';
 
 /**
  * @fileOverview A flow to allow users to upload documents and then ask questions about those documents.

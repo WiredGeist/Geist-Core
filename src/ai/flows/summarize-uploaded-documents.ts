@@ -1,4 +1,4 @@
-'use server';
+//'use server';
 
 /**
  * @fileOverview A flow to summarize uploaded documents.
