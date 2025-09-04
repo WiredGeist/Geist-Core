@@ -158,6 +158,8 @@ export function SettingsForm() {
         flashAttn: values.llamaCppFlashAttention,
         mainGpu: values.llamaCppMainGpu,
         tensorSplit: values.llamaCppTensorSplit,
+        // The critical fix: tell the backend this is NOT an embedding server
+        embedding: false, 
       };
       
       await invoke('start_llama_server', { args: payload });
@@ -165,7 +167,13 @@ export function SettingsForm() {
       toast({ title: "Server Command Sent", description: "Llama.cpp server is starting via the Tauri backend." });
 
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Operation Failed", description: `Could not start the server. Error: ${error}` });
+      // --- THIS IS THE CORRECTED SYNTAX ---
+      // The catch block needs curly braces {}
+      toast({ 
+        variant: "destructive", 
+        title: "Operation Failed", 
+        description: `Could not start the server. Error: ${error}` 
+      });
     } finally {
       setIsStartingServer(false);
     }
