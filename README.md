@@ -1,4 +1,3 @@
-
 # GEIST CORE
 
 <p align="center">
