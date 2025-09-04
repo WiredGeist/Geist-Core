@@ -89,7 +89,7 @@ cd Geist-Core
 * **Build the Final Application:**
   If you simply want to build the final, optimized **.exe** **installer to use the application as it is, run this command:**
 
-  **code**Bash
+  **code**Bash 
 
   ```
   npm run tauri build
