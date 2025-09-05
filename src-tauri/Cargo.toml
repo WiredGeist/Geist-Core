@@ -1,4 +1,3 @@
-toml
 [package]
 name = "geist-core"
 version = "1.0.0"
@@ -12,10 +11,12 @@ edition = "2021"
 tauri-build = { version = "2.4.1", features = [] }
 
 [dependencies]
-tauri = { version = "2.8.5", features = [] } 
+
+tauri = { version = "2.8.5", features = [] }
 reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1.8", features = ["v4", "serde"] }
 
+# All plugins must use their latest compatible RC versions
 tauri-plugin-dialog = "2.4.0"
 tauri-plugin-log = "2.7.0"
 tauri-plugin-shell = "2.3.1"

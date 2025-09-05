@@ -10,11 +10,8 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
-// REMOVED: The 'User' icon is no longer needed
 import { MessageSquare, Settings, PlusCircle, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useChatStore } from '@/stores/chat-store';
-// REMOVED: The user store is no longer needed
-// import { useUserStore } from '@/stores/user-store';
 import { useSidebarStore } from '@/stores/sidebar-store';
 import { ChatHistoryList } from './chat/chat-history-list';
 import { cn } from '@/lib/utils';
@@ -28,10 +25,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { startNewConversation } = useChatStore();
-  // REMOVED: The user store usage is gone
-  // const { user } = useUserStore();
   const { isCollapsed: isCollapsedFromStore, toggleSidebar } = useSidebarStore();
-
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
@@ -94,13 +88,7 @@ export function Sidebar() {
       </div>
 
       <div className="mt-auto">
-        {/*
-          REMOVED: The entire user profile link block, including the Avatar,
-          user name, and surrounding tooltips and separators, has been deleted from here.
-        */}
-        
         <div className="border-t border-border -mx-4 my-2"></div>
-
         <div className="flex items-center justify-between">
             <TooltipProvider delayDuration={0}>
                 <Tooltip>

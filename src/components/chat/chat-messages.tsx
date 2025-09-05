@@ -13,16 +13,13 @@ export function ChatMessages() {
     isLoading: state.isLoading,
   }));
   
-  // STEP 1: We only need one ref for the element at the bottom.
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messages = activeConversation?.messages ?? [];
 
-  // STEP 2: Simplify the useEffect hook to trigger whenever 'messages' changes.
   useEffect(() => {
-    // This tells the browser to smoothly scroll our invisible bottom element into view.
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]); // The dependency array now only needs to watch for changes in the messages list.
+  }, [messages]);
 
   return (
     <ScrollArea className="h-full">
@@ -44,7 +41,6 @@ export function ChatMessages() {
                 </div>
               </div>
             )}
-            {/* STEP 3: Place the invisible element with the ref at the very end of the list. */}
             <div ref={bottomRef} />
         </div>
     </ScrollArea>

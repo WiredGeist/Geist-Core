@@ -18,22 +18,16 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { RagManager } from './rag-manager';
 
-// This interface is now defined globally in use-settings.ts, so it's removed from here.
-
 export function ChatPanel() {
-  const { settings, setSettings } = useSettings(); // <-- GET setSettings
+  const { settings, setSettings } = useSettings(); 
   const { toast } = useToast();
-  // --- REMOVED LOCAL STATE FOR MODELS AND LOADING ---
   const [isRagManagerOpen, setIsRagManagerOpen] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [isChangingModel, setIsChangingModel] = useState(false);
-
   const { addMessage, isLoading, selectedModel, setSelectedModel, createNewConversation } = useChatStore();
   const activeConversation = useChatStore(state => state.activeConversationId ? state.conversations[state.activeConversationId] : null);
   const isGGUFLoaded = useChatStore(state => state.selectedModel === 'gguf-local');
   const isRagActive = useChatStore(state => !!activeConversation?.ragDocuments && activeConversation.ragDocuments.length > 0);
-
-  // --- READ MODELS FROM GLOBAL STATE ---
   const ollamaModels: OllamaModel[] = settings.ollamaModels || [];
   const googleModels: GoogleModel[] = settings.googleModels || [];
 
@@ -72,13 +66,8 @@ export function ChatPanel() {
     }
   };
 
-  // --- REMOVED THE TWO BROKEN useEffect BLOCKS FOR FETCHING MODELS ---
-
   const handleModelChange = async (newModelId: string) => {
     const currentModel = selectedModel;
-    
-    // --- FIX: GOOGLE MODEL NAME HANDLING ---
-    // The value from the select item is already the shortened name
     const modelId = newModelId; 
     
     if (modelId === currentModel) return;
@@ -87,14 +76,13 @@ export function ChatPanel() {
     try {
       if (isGGUFLoaded) await stopGGUFServer();
       
-      // Unload previous Ollama model if it was active
       if (settings.ollamaServer && ollamaModels.some(m => m.name === currentModel)) {
         toast({ title: "Unloading previous model..." });
         await invoke('unload_ollama_model', { ollamaUrl: settings.ollamaServer, modelName: currentModel });
       }
       
       setSelectedModel(modelId);
-      setSettings({ activeOllamaModel: modelId }); // Store active model
+      setSettings({ activeOllamaModel: modelId });
       
       const isNewModelOllama = ollamaModels.some(m => m.name === modelId);
       
@@ -128,14 +116,13 @@ export function ChatPanel() {
       const success = await startLlamaCppServer(settings.localModelPath, false);
       if (success) {
         setSelectedModel('gguf-local');
-        setSettings({ activeOllamaModel: undefined }); // Clear active ollama model
+        setSettings({ activeOllamaModel: undefined });
       }
     } else {
       await stopGGUFServer();
       toast({ title: "Local GGUF model unloaded." });
       const firstOllamaModel = ollamaModels[0]?.name;
       const firstGoogleModel = googleModels[0]?.name;
-      // Default to first available model
       await handleModelChange(firstOllamaModel || firstGoogleModel || 'no-models');
     }
     setIsChangingModel(false);
@@ -214,12 +201,11 @@ export function ChatPanel() {
 
   const getModelDisplayName = (modelId: string) => {
     if (modelId === 'gguf-local') return 'Local GGUF Model';
-    // The name from Google already includes 'gemini', so we just clean it up
     const googleModel = googleModels.find(m => m.name === modelId);
     if (googleModel) return modelId.replace('models/', '');
     const ollamaModel = ollamaModels.find(m => m.name === modelId);
     if (ollamaModel) return ollamaModel.name;
-    return modelId || "Select Model"; // Fallback
+    return modelId || "Select Model";
   };
 
   const hasOllamaModels = ollamaModels.length > 0;

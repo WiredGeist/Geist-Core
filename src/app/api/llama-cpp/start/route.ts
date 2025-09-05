@@ -30,21 +30,16 @@ export async function POST(request: Request) {
 
     const serverPath = path.join(process.cwd(), 'llama-cpp', 'llama-server.exe');
 
-    // --- THIS IS THE KEY CHANGE ---
-    // We are adding the flags needed to enable the /embedding endpoint.
     const args = [
       '-m', modelPath,
       '--n-gpu-layers', gpuLayers.toString(),
       '--port', '8080',
       '-c', contextSize.toString(),
       '-t', threads.toString(),
-
-      // Add RAG-specific flags based on the documentation you found
       '--embedding',
       '--pooling', 'cls',
       '-ub', '8192'
     ];
-    // --- END OF KEY CHANGE ---
 
     if (flashAttention) { args.push('--flash-attn'); }
     if (quietMode) { args.push('--log-disable'); }

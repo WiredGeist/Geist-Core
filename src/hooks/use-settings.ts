@@ -4,8 +4,6 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-
-// --- NEW TYPES FOR MODELS ---
 export interface OllamaModel {
   name: string;
   modified_at: string;
@@ -23,7 +21,6 @@ export interface Settings {
     openAIKey?: string;
     anthropicKey?: string;
     googleKey?: string;
-    // --- ADDED THESE TWO LINES ---
     ollamaModels?: OllamaModel[];
     googleModels?: GoogleModel[];
     
@@ -68,18 +65,16 @@ export interface Settings {
 
 interface SettingsState {
   settings: Settings;
-  // --- UPDATED setSettings TO ACCEPT PARTIAL UPDATES ---
   setSettings: (newSettings: Partial<Settings>) => void;
 }
 
 const defaultSettings: Settings = {
     localModelPath: "",
     embeddingModelPath: "",
-    ollamaServer: "http://localhost:11434", // Set a default for convenience
+    ollamaServer: "http://localhost:11434",
     openAIKey: "",
     anthropicKey: "",
     googleKey: "",
-    // --- ADDED DEFAULTS FOR THE NEW ARRAYS ---
     ollamaModels: [],
     googleModels: [],
 
@@ -124,8 +119,6 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       settings: defaultSettings,
-      // --- THIS IS THE IMPROVED setSettings FUNCTION ---
-      // It merges new settings instead of replacing the whole object.
       setSettings: (newSettings: Partial<Settings>) => set((state) => ({ 
         settings: { ...state.settings, ...newSettings }
       })),

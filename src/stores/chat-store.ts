@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { useSettings, GoogleModel, OllamaModel } from '@/hooks/use-settings'; // <-- CORRECT IMPORTS
+import { useSettings, GoogleModel, OllamaModel } from '@/hooks/use-settings';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; }
@@ -49,7 +49,6 @@ interface ChatState {
 }
 
 const isGGUFModel = (modelId: string) => modelId === 'gguf-local';
-// --- CORRECTED LOGIC TO IDENTIFY GOOGLE MODELS ---
 const isGoogleModel = (modelId: string) => modelId.startsWith('models/'); 
 
 
@@ -141,7 +140,6 @@ export const useChatStore = create<ChatState>()(
         get().startNewConversation();
       },
 
-      // --- COMPLETE REWRITE OF THE addMessage FUNCTION ---
       addMessage: async (content: string, context?: string) => {
         let activeId = get().activeConversationId;
         if (!activeId) {
@@ -171,7 +169,6 @@ export const useChatStore = create<ChatState>()(
           
           let assistantResponse = '';
 
-          // Construct the full prompt including context if it exists
           let promptContent = content;
           if (context && context.trim() !== '') {
             promptContent = CONTEXT_PROMPT.replace('{context}', context).replace('{question}', content);
@@ -182,7 +179,6 @@ export const useChatStore = create<ChatState>()(
           if (isGoogleModel(selectedModel)) {
             if (!settings.googleKey) throw new Error("Google API Key not set.");
             
-            // For Gemini, we create a simple string prompt for now
             const prompt = messagesForApi.map(m => `${m.role}: ${m.content}`).join('\n');
             
             assistantResponse = await invoke('call_gemini_api', {
@@ -195,7 +191,7 @@ export const useChatStore = create<ChatState>()(
             const res = await fetch('http://localhost:8080/v1/chat/completions', { 
               method: 'POST', 
               headers: {'Content-Type': 'application/json'}, 
-              body: JSON.stringify({ model: selectedModel, messages: messagesForApi, stream: false }) // Use non-streaming for simplicity
+              body: JSON.stringify({ model: selectedModel, messages: messagesForApi, stream: false })
             });
             if (!res.ok) {
               const errorText = await res.text();
@@ -204,7 +200,7 @@ export const useChatStore = create<ChatState>()(
             const data = await res.json();
             assistantResponse = data.choices[0]?.message?.content || '';
 
-          } else { // This handles Ollama models
+          } else { 
             if (!settings.ollamaServer) throw new Error("Ollama server not configured.");
             
             assistantResponse = await invoke('call_ollama_api', {
@@ -214,7 +210,6 @@ export const useChatStore = create<ChatState>()(
             });
           }
 
-          // Update the final assistant message content
           set(state => {
               const convo = state.conversations[activeId!];
               const lastMsg = convo.messages[convo.messages.length - 1];

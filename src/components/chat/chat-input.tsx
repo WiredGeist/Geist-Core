@@ -34,7 +34,6 @@ export function ChatInput({ onSend, onFileSelect, isLoading }: ChatInputProps) {
     if (file) {
       onFileSelect(file);
     }
-    // Reset file input value to allow selecting the same file again
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }

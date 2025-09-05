@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import { ChatAvatar } from '@/components/chat/chat-avatar';
 import { Button } from '@/components/ui/button';
-import { Copy, Pencil, Check, X } from 'lucide-react'; // REMOVED: 'Play' icon is no longer needed
+import { Copy, Pencil, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useChatStore, type Message } from '@/stores/chat-store';
@@ -23,7 +23,7 @@ const CodeBlock = ({ code }: { code: string }) => {
             await navigator.clipboard.writeText(code);
             setIsCopied(true);
             toast({ title: "Code block copied!" });
-            setTimeout(() => setIsCopied(false), 2000); // Revert icon after 2 seconds
+            setTimeout(() => setIsCopied(false), 2000);
         } catch (err) {
             console.error('Failed to copy code: ', err);
             toast({ variant: "destructive", title: "Copy Failed", description: "Could not copy code to clipboard." });
@@ -144,7 +144,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <TooltipProvider delayDuration={0}>
                 {isAssistant ? (
                     <>
-                        {/* REMOVED: The entire Tooltip wrapper for the Play/TTS button has been deleted. */}
                         <Tooltip>
                             <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleCopyMessage}>

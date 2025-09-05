@@ -48,7 +48,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useSettings, type Settings } from "@/hooks/use-settings";
 import { useChatStore } from "@/stores/chat-store";
 
-// --- NEW TYPES FOR MODELS ---
 interface OllamaModel {
   name: string;
   modified_at: string;
@@ -117,15 +116,12 @@ export function SettingsForm() {
   const [isStartingServer, setIsStartingServer] = useState(false);
   const [isStoppingServer, setIsStoppingServer] = useState(false);
   const clearAllChatData = useChatStore(state => state.clearAllData);
-
-  // --- NEW STATE FOR MODEL FETCHING ---
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [googleModels, setGoogleModels] = useState<GoogleModel[]>([]);
   const [isOllamaLoading, setIsOllamaLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [ollamaError, setOllamaError] = useState('');
   const [googleError, setGoogleError] = useState('');
-
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: settings,
@@ -153,7 +149,6 @@ export function SettingsForm() {
     });
   }
 
-  // --- NEW HANDLER FOR OLLAMA MODELS ---
   const handleFetchOllamaModels = async () => {
     const ollamaUrl = form.getValues('ollamaServer');
     if (!ollamaUrl) {
@@ -165,7 +160,6 @@ export function SettingsForm() {
     
     try {
       const models: OllamaModel[] = await invoke('list_ollama_models', { ollamaUrl });
-      // --- THIS IS THE KEY CHANGE: SAVE TO GLOBAL STATE ---
       setSettings({ ollamaModels: models }); 
       
       if (models.length === 0) {
@@ -175,14 +169,13 @@ export function SettingsForm() {
       }
     } catch (err: any) {
       setOllamaError(err.toString());
-      setSettings({ ollamaModels: [] }); // Clear models on error
+      setSettings({ ollamaModels: [] });
       toast({ variant: "destructive", title: "Ollama Error", description: err.toString() });
     } finally {
       setIsOllamaLoading(false);
     }
   };
 
-  // --- NEW HANDLER FOR GOOGLE MODELS ---
   const handleFetchGoogleModels = async () => {
     const apiKey = form.getValues('googleKey');
     if (!apiKey) {
@@ -194,13 +187,12 @@ export function SettingsForm() {
     
     try {
       const models: GoogleModel[] = await invoke('list_google_models', { apiKey });
-      // --- THIS IS THE KEY CHANGE: SAVE TO GLOBAL STATE ---
       setSettings({ googleModels: models }); 
 
       toast({ title: "Success", description: `Found ${models.length} Google Gemini models.`});
     } catch (err: any) {
       setGoogleError(err.toString());
-      setSettings({ googleModels: [] }); // Clear models on error
+      setSettings({ googleModels: [] });
       toast({ variant: "destructive", title: "Google API Error", description: err.toString() });
     } finally {
       setIsGoogleLoading(false);

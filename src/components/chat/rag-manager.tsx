@@ -45,7 +45,7 @@ export function RagManager({ isOpen, onOpenChange, onFileSelect, isEmbedding }: 
     }
 
     try {
-      await onFileSelect(file); // Calls the function from ChatPanel
+      await onFileSelect(file);
     } catch (e: any) {
       setError(e.message || "An unknown error occurred during processing.");
     }
